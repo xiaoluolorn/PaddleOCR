@@ -6,9 +6,9 @@
 NULL
 
 #' Default PaddleOCR API job URL
-#' @keywords internal
+#' @noRd
 PADDLE_JOB_URL <- "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
 
 #' Default PaddleOCR model
-#' @keywords internal
+#' @noRd
 PADDLE_DEFAULT_MODEL <- "PaddleOCR-VL-1.6"

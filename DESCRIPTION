@@ -2,7 +2,7 @@ Package: PaddleOCR
 Title: R Client for PaddleOCR Cloud API
 Version: 0.1.0
 Authors@R: person("Chaoyang", "Luo", email = "xiaoluolorn@gmail.com", role = c("aut", "cre"))
-Description: An R client for the PaddleOCR cloud service API (<https://paddleocr.aistudio-app.com>).
+Description: An R client for the PaddleOCR cloud service API.
     Submit images, PDFs, or URLs for OCR processing using models like PaddleOCR-VL-1.6.
     Supports job submission, polling, result retrieval, automatic image download,
     and streaming PDF-to-markdown conversion with batch processing.
@@ -18,11 +18,9 @@ Imports:
 Suggests:
     pdftools (>= 3.0.0),
     testthat (>= 3.0.0),
-    knitr,
-    rmarkdown,
+    withr,
     covr
-VignetteBuilder: knitr
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
+Config/roxygen2/version: 8.0.0

@@ -6,7 +6,7 @@
 #' @param x First value.
 #' @param y Fallback value.
 #' @return \code{x} if it is "present", else \code{y}.
-#' @keywords internal
+#' @noRd
 `%||%` <- function(x, y) {
   if (is.null(x) || length(x) == 0 || (is.character(x) && identical(x, ""))) {
     y
@@ -24,7 +24,7 @@
 #' @param dest_path Local file path to save to.
 #' @param timeout Timeout in seconds (default: 300).
 #' @return The \code{dest_path}, invisibly.
-#' @keywords internal
+#' @noRd
 download_binary_file <- function(url, dest_path, timeout = 300) {
   dir.create(dirname(dest_path), showWarnings = FALSE, recursive = TRUE)
 
@@ -49,7 +49,7 @@ download_binary_file <- function(url, dest_path, timeout = 300) {
 #' @param url A URL string.
 #' @param fallback Fallback extension (default: "jpg").
 #' @return File extension string without a leading dot.
-#' @keywords internal
+#' @noRd
 guess_extension_from_url <- function(url, fallback = "jpg") {
   url_no_query <- sub("\\?.*$", "", url)
   extension <- tools::file_ext(url_no_query)
@@ -63,7 +63,7 @@ guess_extension_from_url <- function(url, fallback = "jpg") {
 #'
 #' @param token Explicit token string (may be \code{""}).
 #' @return The resolved token string.
-#' @keywords internal
+#' @noRd
 resolve_token <- function(token) {
   if (!nzchar(token)) {
     token <- Sys.getenv("PADDLE_OCR_TOKEN")
@@ -82,7 +82,7 @@ resolve_token <- function(token) {
 #'
 #' @param job_url Explicit URL or empty string.
 #' @return The resolved job URL.
-#' @keywords internal
+#' @noRd
 resolve_job_url <- function(job_url) {
   if (!nzchar(job_url)) PADDLE_JOB_URL else job_url
 }
@@ -91,7 +91,7 @@ resolve_job_url <- function(job_url) {
 #'
 #' @param model Explicit model name or empty string.
 #' @return The resolved model name.
-#' @keywords internal
+#' @noRd
 resolve_model <- function(model) {
   if (!nzchar(model)) PADDLE_DEFAULT_MODEL else model
 }

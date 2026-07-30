@@ -6,18 +6,23 @@
 \alias{PaddleOCR-package}
 \title{PaddleOCR: R Client for PaddleOCR Cloud API}
 \description{
-An R client for the PaddleOCR cloud service API (\url{https://paddleocr.aistudio-app.com}). Submit images, PDFs, or URLs for OCR processing using models like PaddleOCR-VL-1.6. Supports job submission, polling, result retrieval, automatic image download, and streaming PDF-to-markdown conversion with batch processing.
+An R client for the PaddleOCR cloud service API. Submit images, PDFs, or URLs for OCR processing using models like PaddleOCR-VL-1.6. Supports job submission, polling, result retrieval, automatic image download, and streaming PDF-to-markdown conversion with batch processing.
 }
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/yourusername/PaddleOCR}
-  \item Report bugs at \url{https://github.com/yourusername/PaddleOCR/issues}
+  \item \url{https://github.com/xiaoluolorn/PaddleOCR}
+  \item Report bugs at \url{https://github.com/xiaoluolorn/PaddleOCR/issues}
 }
 
 }
 \author{
-\strong{Maintainer}: First Last \email{first.last@example.com}
+\strong{Maintainer}: Chaoyang Luo \email{xiaoluolorn@gmail.com}
+
+Authors:
+\itemize{
+  \item Chaoyang Luo \email{xiaoluolorn@gmail.com}
+}
 
 }
 \keyword{internal}

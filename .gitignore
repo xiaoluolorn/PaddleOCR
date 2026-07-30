@@ -18,6 +18,13 @@
 # Output files from R CMD check
 /*.Rcheck/
 
+# Local package library used for development checks
+/.Rlib/
+
+# Downloaded source archives
+/.downloaded/
+/*.zip
+
 # RStudio files
 .Rproj.user/
 

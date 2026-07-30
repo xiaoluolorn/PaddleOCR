@@ -1,0 +1,5 @@
+^\.Rlib$
+^\.downloaded$
+^\.git$
+^PaddleOCR.*\.zip$
+^cran-comments\.md$

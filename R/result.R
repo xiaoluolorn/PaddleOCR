@@ -7,7 +7,7 @@
 #' @param output_dir Directory to save files into.
 #' @param doc_name Base name for the Markdown file (without extension).
 #' @return Path to the saved Markdown file, invisibly.
-#' @keywords internal
+#' @noRd
 save_layout_markdown <- function(layout_result, output_dir, doc_name) {
   markdown <- layout_result$markdown %||% list()
   markdown_text <- markdown$text %||% ""

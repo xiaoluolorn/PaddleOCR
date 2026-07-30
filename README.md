@@ -3,10 +3,10 @@
 <!-- badges: start -->
 [![CRAN status](https://www.r-pkg.org/badges/version/PaddleOCR)](https://CRAN.R-project.org/package=PaddleOCR)
 [![R-CMD-check](https://github.com/xiaoluolorn/PaddleOCR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/xiaoluolorn/PaddleOCR/actions/workflows/R-CMD-check.yaml)
-[![Codecov test coverage](https://codecov.io/gh/xiaoluolorn/PaddleOCR/branch/main/graph/badge.svg)](https://app.codecov.io/gh/xiaoluolorn/PaddleOCR?branch=main)
+[![Codecov test coverage](https://codecov.io/gh/xiaoluolorn/PaddleOCR/branch/master/graph/badge.svg)](https://app.codecov.io/gh/xiaoluolorn/PaddleOCR?branch=master)
 <!-- badges: end -->
 
-An R client for the [PaddleOCR](https://paddleocr.aistudio-app.com) cloud API. Submit images, PDFs, or URLs for OCR processing and get structured Markdown output with automatic image downloading.
+An R client for the PaddleOCR cloud API. Submit images, PDFs, or URLs for OCR processing and get structured Markdown output with automatic image downloading.
 
 ## Installation
 
