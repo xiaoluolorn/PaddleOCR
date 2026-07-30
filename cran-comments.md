@@ -1,3 +1,12 @@
+## Resubmission
+
+This is a resubmission. In this version I have:
+
+* declared the `withr` test dependency;
+* removed the unused vignette builder declaration;
+* excluded development artifacts from the source package;
+* regenerated package documentation and removed an invalid public URL.
+
 ## Test environments
 
 * local Windows 11, R 4.5.0
