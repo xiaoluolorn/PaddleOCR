@@ -10,6 +10,8 @@ pdf_to_markdown_with_paddle(
   combined_markdown = TRUE,
   dpi = 300,
   batch_trigger = 3,
+  workers = 1,
+  resume = TRUE,
   token = "",
   job_url = "",
   model = "",
@@ -35,6 +37,13 @@ page Markdown into a single file.}
 
 \item{batch_trigger}{Number of pages to render before starting OCR
 (default: 3).}
+
+\item{workers}{Maximum number of OCR jobs submitted concurrently (default:
+1). OCR runs concurrently on the PaddleOCR service; result polling remains
+local and sequential.}
+
+\item{resume}{Logical; reuse rendered page images, completed Markdown files,
+and submitted job IDs from an interrupted run (default: \code{TRUE}).}
 
 \item{token}{PaddleOCR API token.}
 

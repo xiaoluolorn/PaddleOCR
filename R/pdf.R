@@ -49,13 +49,19 @@ pdf_to_images <- function(pdf_path, image_dir, dpi = 300) {
 #' @param page_index Page number to render (1-indexed).
 #' @param image_dir Directory to save the PNG image.
 #' @param dpi Resolution in dots per inch (default: 300).
+#' @param overwrite Logical; overwrite an existing rendered page. Set to
+#'   \code{FALSE} to reuse it (default: \code{TRUE}).
 #' @return Path to the saved PNG image.
 #' @export
 #' @examples
 #' \dontrun{
 #' img <- pdf_page_to_image("document.pdf", page_index = 1, image_dir = "pages")
 #' }
-pdf_page_to_image <- function(pdf_path, page_index, image_dir, dpi = 300) {
+pdf_page_to_image <- function(pdf_path,
+                              page_index,
+                              image_dir,
+                              dpi = 300,
+                              overwrite = TRUE) {
   if (!requireNamespace("pdftools", quietly = TRUE)) {
     stop("Package 'pdftools' is required for PDF conversion. Install it with install.packages('pdftools').", call. = FALSE)
   }
@@ -63,6 +69,11 @@ pdf_page_to_image <- function(pdf_path, page_index, image_dir, dpi = 300) {
 
   base_name <- tools::file_path_sans_ext(basename(pdf_path))
   dest_path <- file.path(image_dir, sprintf("%s_%03d.png", base_name, page_index))
+
+  if (!isTRUE(overwrite) && file.exists(dest_path)) {
+    message("Reusing rendered page: ", dest_path)
+    return(dest_path)
+  }
 
   # Render into a unique temp directory to avoid pdftools sprintf template issues
   tmp_dir <- file.path(tempdir(), paste0("PaddleOCR_", as.integer(Sys.time()), "_", page_index))
@@ -164,6 +175,69 @@ image_to_markdown <- function(image_path,
   )
 }
 
+#' Read a completed OCR result from disk
+#' @noRd
+read_existing_page_result <- function(output_dir, page_index) {
+  state <- read_page_state(output_dir, page_index)
+  if (!is.null(state) && identical(state$status, "completed")) {
+    return(state$result)
+  }
+
+  markdown_path <- file.path(output_dir, sprintf("doc_%d.md", page_index - 1L))
+  if (!file.exists(markdown_path)) {
+    return(NULL)
+  }
+
+  list(
+    markdown_paths = markdown_path,
+    markdown_texts = paste(readLines(markdown_path, warn = FALSE), collapse = "\n"),
+    job_id = NULL
+  )
+}
+
+#' Validate the requested OCR concurrency
+#' @noRd
+normalize_workers <- function(workers, page_count) {
+  if (length(workers) != 1L || !is.numeric(workers) || !is.finite(workers) ||
+      workers < 1 || workers != as.integer(workers)) {
+    stop("`workers` must be a positive integer.", call. = FALSE)
+  }
+  min(as.integer(workers), as.integer(page_count))
+}
+
+#' Return the checkpoint path for one PDF page
+#' @noRd
+page_state_path <- function(output_dir, page_index) {
+  file.path(output_dir, ".paddle_state", sprintf("page_%06d.rds", page_index))
+}
+
+#' Read one page checkpoint
+#' @noRd
+read_page_state <- function(output_dir, page_index) {
+  path <- page_state_path(output_dir, page_index)
+  if (!file.exists(path)) {
+    return(NULL)
+  }
+  tryCatch(readRDS(path), error = function(e) NULL)
+}
+
+#' Atomically write one page checkpoint
+#' @noRd
+write_page_state <- function(output_dir, page_index, state) {
+  path <- page_state_path(output_dir, page_index)
+  dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
+  temporary_path <- tempfile("page_state_", tmpdir = dirname(path), fileext = ".rds")
+  on.exit(unlink(temporary_path, force = TRUE), add = TRUE)
+  saveRDS(state, temporary_path)
+  if (file.exists(path)) {
+    file.remove(path)
+  }
+  if (!file.rename(temporary_path, path)) {
+    stop("Failed to save OCR checkpoint for page ", page_index, ".", call. = FALSE)
+  }
+  invisible(path)
+}
+
 #' Convert a PDF to Markdown via PaddleOCR
 #'
 #' Renders PDF pages to images one by one, then submits them for OCR using
@@ -181,6 +255,11 @@ image_to_markdown <- function(image_path,
 #' @param dpi Image resolution for rendering (default: 300).
 #' @param batch_trigger Number of pages to render before starting OCR
 #'   (default: 3).
+#' @param workers Maximum number of OCR jobs submitted concurrently (default:
+#'   1). OCR runs concurrently on the PaddleOCR service; result polling remains
+#'   local and sequential.
+#' @param resume Logical; reuse rendered page images, completed Markdown files,
+#'   and submitted job IDs from an interrupted run (default: \code{TRUE}).
 #' @param token PaddleOCR API token.
 #' @param job_url PaddleOCR API endpoint.
 #' @param model Model name.
@@ -204,6 +283,8 @@ pdf_to_markdown_with_paddle <- function(pdf_path,
                                         combined_markdown = TRUE,
                                         dpi = 300,
                                         batch_trigger = 3,
+                                        workers = 1,
+                                        resume = TRUE,
                                         token = "",
                                         job_url = "",
                                         model = "",
@@ -239,7 +320,12 @@ pdf_to_markdown_with_paddle <- function(pdf_path,
   dir.create(page_output_dir, showWarnings = FALSE, recursive = TRUE)
 
   page_count <- pdftools::pdf_info(pdf_path)$pages
-  message(sprintf("PDF has %d page(s). Streaming render -> OCR (trigger=%d).", page_count, batch_trigger))
+  workers <- normalize_workers(workers, page_count)
+  render_trigger <- max(batch_trigger, workers)
+  message(sprintf(
+    "PDF has %d page(s). Streaming render -> OCR (trigger=%d, workers=%d, resume=%s).",
+    page_count, render_trigger, workers, isTRUE(resume)
+  ))
 
   combined_text <- character(page_count)
   markdown_files <- character(page_count)
@@ -248,24 +334,104 @@ pdf_to_markdown_with_paddle <- function(pdf_path,
   pending <- integer(0)
 
   run_ocr_for <- function(indices) {
+    page_results <- vector("list", length(indices))
+    names(page_results) <- as.character(indices)
+
+    if (isTRUE(resume)) {
+      for (idx in indices) {
+        existing <- read_existing_page_result(page_output_dir, idx)
+        if (!is.null(existing)) {
+          message(sprintf("Reusing OCR result for page %d/%d.", idx, page_count))
+          page_results[[as.character(idx)]] <- existing
+        }
+      }
+    }
+
+    remaining <- indices[vapply(
+      as.character(indices),
+      function(index) is.null(page_results[[index]]),
+      logical(1)
+    )]
+
+    chunks <- split(remaining, ceiling(seq_along(remaining) / workers))
+    for (chunk in chunks) {
+      job_ids <- character(length(chunk))
+      names(job_ids) <- as.character(chunk)
+
+      for (idx in chunk) {
+        state <- if (isTRUE(resume)) read_page_state(page_output_dir, idx) else NULL
+        if (!is.null(state) && identical(state$status, "submitted") &&
+            nzchar(state$job_id %||% "")) {
+          job_ids[[as.character(idx)]] <- state$job_id
+          message(sprintf("Resuming submitted OCR job for page %d/%d.", idx, page_count))
+        } else {
+          message(sprintf("Submitting OCR for page %d/%d: %s", idx, page_count, basename(image_paths[idx])))
+          job_id <- submit_paddle_job(
+            file_path = image_paths[idx],
+            token = token,
+            job_url = job_url,
+            model = model,
+            use_doc_orientation_classify = use_doc_orientation_classify,
+            use_doc_unwarping = use_doc_unwarping,
+            use_chart_recognition = use_chart_recognition,
+            timeout = timeout
+          )
+          job_ids[[as.character(idx)]] <- job_id
+          write_page_state(
+            page_output_dir,
+            idx,
+            list(status = "submitted", job_id = job_id)
+          )
+        }
+      }
+
+      for (idx in chunk) {
+        job_id <- job_ids[[as.character(idx)]]
+        message(sprintf("Collecting OCR result for page %d/%d.", idx, page_count))
+        jsonl_url <- tryCatch(
+          poll_paddle_job(
+            job_id = job_id,
+            token = token,
+            job_url = job_url,
+            poll_interval = poll_interval,
+            max_wait_seconds = max_wait_seconds
+          ),
+          error = function(e) {
+            if (grepl("^Job failed", conditionMessage(e))) {
+              write_page_state(
+                page_output_dir,
+                idx,
+                list(
+                  status = "failed",
+                  job_id = job_id,
+                  error = conditionMessage(e)
+                )
+              )
+            }
+            stop(e)
+          }
+        )
+        parsed_result <- process_paddle_jsonl_result(
+          jsonl_url = jsonl_url,
+          output_dir = page_output_dir,
+          starting_doc_index = idx - 1L
+        )
+        page_result <- list(
+          markdown_paths = parsed_result$markdown_files,
+          markdown_texts = parsed_result$markdown_texts,
+          job_id = job_id
+        )
+        page_results[[as.character(idx)]] <- page_result
+        write_page_state(
+          page_output_dir,
+          idx,
+          list(status = "completed", job_id = job_id, result = page_result)
+        )
+      }
+    }
+
     for (idx in indices) {
-      message(sprintf("Running OCR for page %d/%d: %s", idx, page_count, basename(image_paths[idx])))
-
-      page_result <- image_to_markdown(
-        image_path = image_paths[idx],
-        output_dir = page_output_dir,
-        page_index = idx,
-        token = token,
-        job_url = job_url,
-        model = model,
-        use_doc_orientation_classify = use_doc_orientation_classify,
-        use_doc_unwarping = use_doc_unwarping,
-        use_chart_recognition = use_chart_recognition,
-        poll_interval = poll_interval,
-        max_wait_seconds = max_wait_seconds,
-        timeout = timeout
-      )
-
+      page_result <- page_results[[as.character(idx)]]
       combined_text[idx] <<- paste(page_result$markdown_texts, collapse = "\n\n")
       markdown_files[idx] <<- paste(page_result$markdown_paths, collapse = ", ")
     }
@@ -277,11 +443,12 @@ pdf_to_markdown_with_paddle <- function(pdf_path,
       pdf_path = pdf_path,
       page_index = i,
       image_dir = image_dir,
-      dpi = dpi
+      dpi = dpi,
+      overwrite = !isTRUE(resume)
     )
     pending <- c(pending, i)
 
-    if (length(pending) >= batch_trigger) {
+    if (length(pending) >= render_trigger) {
       message(sprintf("Reached %d pending pages, starting OCR batch...", length(pending)))
       run_ocr_for(pending)
       pending <- integer(0)

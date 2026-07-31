@@ -1,11 +1,10 @@
-## Resubmission
+## Release 0.2.1
 
-This is a resubmission. In this version I have:
+In this version I have:
 
-* declared the `withr` test dependency;
-* removed the unused vignette builder declaration;
-* excluded development artifacts from the source package;
-* regenerated package documentation and removed an invalid public URL.
+* added resumable PDF rendering and OCR processing;
+* persisted submitted job IDs so interrupted jobs can be resumed;
+* added bounded concurrent OCR job submission through the cloud API.
 
 ## Test environments
 

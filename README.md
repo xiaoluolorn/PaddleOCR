@@ -59,6 +59,14 @@ result <- pdf_to_markdown_with_paddle("paper.pdf")
 cat(result$combined_markdown_text)
 ```
 
+Interrupted runs resume automatically by reusing rendered page images,
+completed Markdown files, and submitted OCR job IDs. To run up to eight OCR
+jobs concurrently on the PaddleOCR service:
+
+```r
+result <- pdf_to_markdown_with_paddle("paper.pdf", workers = 8)
+```
+
 ### Batch process PDFs
 
 ```r

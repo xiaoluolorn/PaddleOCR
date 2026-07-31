@@ -9,6 +9,8 @@ batch_pdf_to_markdown_with_paddle(
   output_root = file.path(pdf_dir, "paddle_output"),
   dpi = 300,
   batch_trigger = 3,
+  workers = 1,
+  resume = TRUE,
   token = "",
   job_url = "",
   model = "",
@@ -27,6 +29,10 @@ batch_pdf_to_markdown_with_paddle(
 
 \item{batch_trigger}{Number of pages to render before starting OCR
 (default: 3).}
+
+\item{workers}{Maximum number of OCR jobs submitted concurrently.}
+
+\item{resume}{Logical; reuse completed work from interrupted runs.}
 
 \item{token}{PaddleOCR API token.}
 

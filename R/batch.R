@@ -10,6 +10,8 @@
 #' @param dpi Image resolution for rendering (default: 300).
 #' @param batch_trigger Number of pages to render before starting OCR
 #'   (default: 3).
+#' @param workers Maximum number of OCR jobs submitted concurrently.
+#' @param resume Logical; reuse completed work from interrupted runs.
 #' @param token PaddleOCR API token.
 #' @param job_url PaddleOCR API endpoint.
 #' @param model Model name.
@@ -30,6 +32,8 @@ batch_pdf_to_markdown_with_paddle <- function(pdf_dir = ".",
                                               output_root = file.path(pdf_dir, "paddle_output"),
                                               dpi = 300,
                                               batch_trigger = 3,
+                                              workers = 1,
+                                              resume = TRUE,
                                               token = "",
                                               job_url = "",
                                               model = "",
@@ -64,6 +68,8 @@ batch_pdf_to_markdown_with_paddle <- function(pdf_dir = ".",
         output_dir = output_dir,
         dpi = dpi,
         batch_trigger = batch_trigger,
+        workers = workers,
+        resume = resume,
         token = token,
         job_url = job_url,
         model = model,

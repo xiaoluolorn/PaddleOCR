@@ -106,3 +106,139 @@ test_that("batch_pdf_to_markdown_with_paddle errors on empty directory", {
     )
   })
 })
+
+test_that("pdf_page_to_image reuses an existing rendered page", {
+  withr::with_tempdir({
+    pdf_path <- "document.pdf"
+    image_dir <- "pages"
+    writeLines("placeholder", pdf_path)
+    dir.create(image_dir)
+    existing <- file.path(image_dir, "document_001.png")
+    writeBin(charToRaw("already rendered"), existing)
+
+    expect_message(
+      result <- pdf_page_to_image(
+        pdf_path,
+        page_index = 1,
+        image_dir = image_dir,
+        overwrite = FALSE
+      ),
+      "Reusing rendered page"
+    )
+    expect_equal(result, existing)
+    expect_equal(readBin(existing, "raw", n = 100), charToRaw("already rendered"))
+  })
+})
+
+test_that("existing page markdown is returned as a completed OCR result", {
+  withr::with_tempdir({
+    dir.create("markdown_pages")
+    path <- file.path("markdown_pages", "doc_4.md")
+    writeLines("cached OCR text", path)
+
+    result <- PaddleOCR:::read_existing_page_result("markdown_pages", 5)
+
+    expect_equal(result$markdown_paths, path)
+    expect_equal(result$markdown_texts, "cached OCR text")
+    expect_null(result$job_id)
+  })
+})
+
+test_that("worker count is validated and capped by the page count", {
+  expect_equal(PaddleOCR:::normalize_workers(1, 10), 1L)
+  expect_equal(PaddleOCR:::normalize_workers(8, 3), 3L)
+  expect_error(PaddleOCR:::normalize_workers(0, 3), "positive integer")
+  expect_error(PaddleOCR:::normalize_workers(1.5, 3), "positive integer")
+})
+
+test_that("multiple OCR jobs are submitted before result polling", {
+  withr::with_tempdir({
+    writeLines("placeholder", "document.pdf")
+    events <- character(0)
+
+    local_mocked_bindings(
+      pdf_info = function(...) list(pages = 2L),
+      .package = "pdftools"
+    )
+    local_mocked_bindings(
+      pdf_page_to_image = function(pdf_path, page_index, image_dir, ...) {
+        path <- file.path(image_dir, sprintf("document_%03d.png", page_index))
+        writeBin(as.raw(page_index), path)
+        path
+      },
+      submit_paddle_job = function(file_path, ...) {
+        page <- as.integer(sub(".*_(\\d+)\\.png$", "\\1", file_path))
+        events <<- c(events, paste0("submit-", page))
+        paste0("job-", page)
+      },
+      poll_paddle_job = function(job_id, ...) {
+        events <<- c(events, paste0("poll-", sub("job-", "", job_id)))
+        paste0("result-", job_id)
+      },
+      process_paddle_jsonl_result = function(jsonl_url, output_dir,
+                                             starting_doc_index) {
+        path <- file.path(output_dir, sprintf("doc_%d.md", starting_doc_index))
+        text <- paste0("page ", starting_doc_index + 1L)
+        writeLines(text, path)
+        list(markdown_files = path, markdown_texts = text, doc_count = 1L)
+      },
+      .package = "PaddleOCR"
+    )
+
+    pdf_to_markdown_with_paddle(
+      "document.pdf",
+      output_dir = "output",
+      workers = 2,
+      batch_trigger = 1,
+      resume = FALSE,
+      token = "token",
+      combined_markdown = FALSE
+    )
+
+    expect_equal(events, c("submit-1", "submit-2", "poll-1", "poll-2"))
+  })
+})
+
+test_that("a submitted job checkpoint is resumed without resubmission", {
+  withr::with_tempdir({
+    writeLines("placeholder", "document.pdf")
+    dir.create(file.path("output", "pages"), recursive = TRUE)
+    image_path <- file.path("output", "pages", "document_001.png")
+    writeBin(as.raw(1), image_path)
+    page_output_dir <- file.path("output", "markdown_pages")
+    PaddleOCR:::write_page_state(
+      page_output_dir,
+      1,
+      list(status = "submitted", job_id = "existing-job")
+    )
+
+    local_mocked_bindings(
+      pdf_info = function(...) list(pages = 1L),
+      .package = "pdftools"
+    )
+    local_mocked_bindings(
+      submit_paddle_job = function(...) stop("must not resubmit"),
+      poll_paddle_job = function(job_id, ...) {
+        expect_equal(job_id, "existing-job")
+        "result-url"
+      },
+      process_paddle_jsonl_result = function(jsonl_url, output_dir,
+                                             starting_doc_index) {
+        path <- file.path(output_dir, "doc_0.md")
+        writeLines("resumed result", path)
+        list(markdown_files = path, markdown_texts = "resumed result", doc_count = 1L)
+      },
+      .package = "PaddleOCR"
+    )
+
+    result <- pdf_to_markdown_with_paddle(
+      "document.pdf",
+      output_dir = "output",
+      resume = TRUE,
+      token = "token",
+      combined_markdown = FALSE
+    )
+
+    expect_equal(result$combined_markdown_text, "resumed result")
+  })
+})

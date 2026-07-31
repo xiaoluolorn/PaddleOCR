@@ -4,7 +4,7 @@
 \alias{pdf_page_to_image}
 \title{Convert a single PDF page to an image}
 \usage{
-pdf_page_to_image(pdf_path, page_index, image_dir, dpi = 300)
+pdf_page_to_image(pdf_path, page_index, image_dir, dpi = 300, overwrite = TRUE)
 }
 \arguments{
 \item{pdf_path}{Path to the PDF file.}
@@ -14,6 +14,9 @@ pdf_page_to_image(pdf_path, page_index, image_dir, dpi = 300)
 \item{image_dir}{Directory to save the PNG image.}
 
 \item{dpi}{Resolution in dots per inch (default: 300).}
+
+\item{overwrite}{Logical; overwrite an existing rendered page. Set to
+\code{FALSE} to reuse it (default: \code{TRUE}).}
 }
 \value{
 Path to the saved PNG image.
